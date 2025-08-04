@@ -23,6 +23,11 @@ function REPL() {
   const [commandInput, setCommandInput] = useState("");
   const [results, setResults] = useState<CommandResult[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [wsMessages, setWsMessages] = useState<any[]>([]);
+  const [previewUrlInput, setPreviewUrlInput] = useState("");
+  const [testWsConnected, setTestWsConnected] = useState(false);
+  const [testWsMessages, setTestWsMessages] = useState<any[]>([]);
+  const [testWebSocket, setTestWebSocket] = useState<WebSocket | null>(null);
   const resultsEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new results are added
@@ -113,6 +118,7 @@ function REPL() {
       },
       onWebSocketMessage: (message) => {
         console.log("WebSocket message received:", message);
+        setWsMessages(prev => [...prev, { ...message, timestamp: new Date() }]);
       },
     });
 
@@ -270,6 +276,89 @@ function REPL() {
     setResults([]);
   };
 
+  const clearWebSocketMessages = () => {
+    setWsMessages([]);
+  };
+
+  const testWebSocketPing = async () => {
+    if (!client || !wsConnected) return;
+    try {
+      client.sendWebSocketMessage({ type: "ping", timestamp: new Date().toISOString() });
+    } catch (error) {
+      console.error('WebSocket ping error:', error);
+    }
+  };
+
+  const testPreviewUrl = async () => {
+    if (!client || !wsConnected || !previewUrlInput.trim()) return;
+    try {
+      const url = await client.requestPreviewUrl(previewUrlInput);
+      console.log('Preview URL response:', url);
+    } catch (error) {
+      console.error('Preview URL request error:', error);
+    }
+  };
+
+  const connectTestWebSocket = () => {
+    if (testWebSocket) {
+      testWebSocket.close();
+    }
+
+    const ws = new WebSocket('ws://localhost:8080');
+    
+    ws.onopen = () => {
+      console.log('[Test WS] Connected to test WebSocket server');
+      setTestWsConnected(true);
+      setTestWebSocket(ws);
+    };
+    
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        console.log('[Test WS] Received:', message);
+        setTestWsMessages(prev => [...prev, { ...message, timestamp: new Date() }]);
+      } catch (error) {
+        console.error('[Test WS] Error parsing message:', error);
+      }
+    };
+    
+    ws.onclose = () => {
+      console.log('[Test WS] Disconnected from test WebSocket server');
+      setTestWsConnected(false);
+      setTestWebSocket(null);
+    };
+    
+    ws.onerror = (error) => {
+      console.error('[Test WS] Connection error:', error);
+      setTestWsConnected(false);
+    };
+  };
+
+  const disconnectTestWebSocket = () => {
+    if (testWebSocket) {
+      testWebSocket.close();
+    }
+  };
+
+  const sendTestMessage = (type: string, data: any = {}) => {
+    if (!testWebSocket || testWebSocket.readyState !== WebSocket.OPEN) {
+      console.error('[Test WS] WebSocket not connected');
+      return;
+    }
+    
+    const message = {
+      type,
+      timestamp: new Date().toISOString(),
+      ...data
+    };
+    
+    testWebSocket.send(JSON.stringify(message));
+  };
+
+  const clearTestMessages = () => {
+    setTestWsMessages([]);
+  };
+
   const getStatusColor = (status: CommandResult["status"]) => {
     switch (status) {
       case "running":
@@ -367,7 +456,156 @@ function REPL() {
           >
             {wsConnected ? 'Disconnect WS' : 'Connect WS'}
           </button>
+          <button 
+            type="button" 
+            onClick={testWebSocketPing}
+            disabled={!wsConnected}
+            className="btn"
+            title="Send WebSocket ping message"
+          >
+            WS Ping
+          </button>
         </div>
+      </div>
+
+      <div className="websocket-test-section">
+        <h3>WebSocket Testing</h3>
+        <div className="websocket-controls">
+          <div className="preview-url-test">
+            <input
+              type="text"
+              className="command-input"
+              value={previewUrlInput}
+              onChange={(e) => setPreviewUrlInput(e.target.value)}
+              placeholder="Enter preview URL (e.g., http://localhost:3000)"
+              disabled={!wsConnected}
+            />
+            <button 
+              type="button" 
+              onClick={testPreviewUrl}
+              disabled={!wsConnected || !previewUrlInput.trim()}
+              className="btn btn-execute"
+            >
+              Test Preview URL
+            </button>
+          </div>
+          <button 
+            type="button" 
+            onClick={clearWebSocketMessages}
+            className="btn"
+          >
+            Clear WS Messages
+          </button>
+        </div>
+        
+        {wsMessages.length > 0 && (
+          <div className="websocket-messages">
+            <h4>WebSocket Messages ({wsMessages.length})</h4>
+            <div className="messages-container">
+              {wsMessages.map((message, index) => (
+                <div key={index} className="ws-message">
+                  <div className="message-header">
+                    <span className="message-type">{message.type}</span>
+                    <span className="message-timestamp">
+                      {message.timestamp.toLocaleTimeString()}
+                    </span>
+                  </div>
+                  <pre className="message-content">
+                    {JSON.stringify(message, null, 2)}
+                  </pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="test-websocket-section">
+        <h3>Test WebSocket Server (ws://localhost:8080)</h3>
+        <div className="test-ws-header">
+          <div className={`connection-status ${testWsConnected ? 'connected' : 'disconnected'}`}>
+            {testWsConnected ? "🔌" : "🔌"}
+            Test WebSocket {testWsConnected ? 'Connected' : 'Disconnected'}
+          </div>
+          <div className="test-ws-controls">
+            <button 
+              type="button" 
+              onClick={testWsConnected ? disconnectTestWebSocket : connectTestWebSocket}
+              className={`btn ${testWsConnected ? 'btn-stream' : 'btn-execute'}`}
+            >
+              {testWsConnected ? 'Disconnect Test WS' : 'Connect Test WS'}
+            </button>
+            <button 
+              type="button" 
+              onClick={clearTestMessages}
+              className="btn"
+            >
+              Clear Test Messages
+            </button>
+          </div>
+        </div>
+        
+        <div className="test-ws-actions">
+          <button 
+            type="button" 
+            onClick={() => sendTestMessage('ping')}
+            disabled={!testWsConnected}
+            className="btn"
+          >
+            Send Ping
+          </button>
+          <button 
+            type="button" 
+            onClick={() => sendTestMessage('echo', { message: 'Hello WebSocket!' })}
+            disabled={!testWsConnected}
+            className="btn"
+          >
+            Send Echo
+          </button>
+          <button 
+            type="button" 
+            onClick={() => sendTestMessage('preview_request', { 
+              requestId: `test_${Date.now()}`, 
+              url: 'http://localhost:3000/test' 
+            })}
+            disabled={!testWsConnected}
+            className="btn btn-execute"
+          >
+            Test Preview Request
+          </button>
+          <button 
+            type="button" 
+            onClick={() => sendTestMessage('broadcast', { 
+              message: 'Hello from the test client!',
+              from: 'Test UI'
+            })}
+            disabled={!testWsConnected}
+            className="btn btn-stream"
+          >
+            Send Broadcast
+          </button>
+        </div>
+        
+        {testWsMessages.length > 0 && (
+          <div className="websocket-messages">
+            <h4>Test WebSocket Messages ({testWsMessages.length})</h4>
+            <div className="messages-container">
+              {testWsMessages.map((message, index) => (
+                <div key={index} className="ws-message">
+                  <div className="message-header">
+                    <span className="message-type">{message.type}</span>
+                    <span className="message-timestamp">
+                      {message.timestamp.toLocaleTimeString()}
+                    </span>
+                  </div>
+                  <pre className="message-content">
+                    {JSON.stringify(message, null, 2)}
+                  </pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="results-container" ref={resultsEndRef}>
@@ -445,6 +683,34 @@ function REPL() {
           <strong>Note:</strong> Use the "Stream" button for commands that
           produce real-time output (like <code>top</code> or{" "}
           <code>tail -f</code>).
+        </div>
+        
+        <h3>WebSocket Testing</h3>
+        <div className="help-grid">
+          <div className="help-item">
+            <span className="help-command">Connect WS</span> - Connect to container WebSocket
+          </div>
+          <div className="help-item">
+            <span className="help-command">WS Ping</span> - Send ping to container
+          </div>
+          <div className="help-item">
+            <span className="help-command">Test Preview URL</span> - Request preview URL from container
+          </div>
+          <div className="help-item">
+            <span className="help-command">Connect Test WS</span> - Connect to test WebSocket server (port 8080)
+          </div>
+          <div className="help-item">
+            <span className="help-command">Send Ping</span> - Send ping to test server
+          </div>
+          <div className="help-item">
+            <span className="help-command">Send Echo</span> - Send echo message to test server
+          </div>
+          <div className="help-item">
+            <span className="help-command">Test Preview Request</span> - Send preview request to test server
+          </div>
+          <div className="help-item">
+            <span className="help-command">Send Broadcast</span> - Broadcast message to all test server clients
+          </div>
         </div>
       </div>
     </div>

@@ -27,9 +27,20 @@ This example creates a Cloudflare Worker that:
    npm install
    ```
 
-2. **Start development server**:
+2. **Start development server with WebSocket testing**:
 
    ```bash
+   npm run dev
+   ```
+
+   This starts both the Cloudflare Worker (port 8787) and the WebSocket test server (port 8080).
+
+   Alternatively, you can start them separately:
+   ```bash
+   # Terminal 1: Start WebSocket test server
+   npm run ws-server
+   
+   # Terminal 2: Start Cloudflare Worker
    npm start
    ```
 
@@ -41,6 +52,12 @@ This example creates a Cloudflare Worker that:
    - `echo "Hello from sandbox!"` - Print text
    - `whoami` - Show current user
    - `cat /etc/os-release` - Display OS information
+
+5. **Test WebSocket functionality**:
+   - Use "Connect WS" to connect to the container's WebSocket endpoint
+   - Use "Connect Test WS" to connect to the standalone test WebSocket server
+   - Send ping, echo, preview requests, and broadcast messages
+   - View real-time WebSocket message logs
 
 ## Architecture
 

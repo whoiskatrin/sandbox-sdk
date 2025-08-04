@@ -526,6 +526,149 @@ button:focus {
   color: transparent;
 }
 
+/* WebSocket Testing Sections */
+.websocket-test-section,
+.test-websocket-section {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background-color: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+}
+
+.websocket-test-section h3,
+.test-websocket-section h3 {
+  color: #58a6ff;
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.websocket-controls,
+.test-ws-header,
+.test-ws-actions {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.test-ws-header {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.test-ws-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.preview-url-test {
+  display: flex;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 300px;
+}
+
+.preview-url-test input {
+  flex: 1;
+}
+
+.test-ws-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.websocket-messages {
+  margin-top: 1rem;
+}
+
+.websocket-messages h4 {
+  color: #58a6ff;
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+  font-weight: 500;
+}
+
+.messages-container {
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+.ws-message {
+  padding: 0.75rem;
+  border-bottom: 1px solid #30363d;
+  animation: fadeIn 0.3s ease;
+}
+
+.ws-message:last-child {
+  border-bottom: none;
+}
+
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.message-type {
+  background-color: rgba(88, 166, 255, 0.2);
+  color: #58a6ff;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: "Fira Code", monospace;
+}
+
+.message-timestamp {
+  color: #8b949e;
+  font-size: 0.8rem;
+  font-family: "Fira Code", monospace;
+}
+
+.message-content {
+  background-color: rgba(88, 166, 255, 0.05);
+  border: 1px solid rgba(88, 166, 255, 0.1);
+  border-radius: 4px;
+  padding: 0.5rem;
+  margin: 0;
+  font-size: 0.8rem;
+  color: #c9d1d9;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Responsive design for WebSocket sections */
+@media (max-width: 768px) {
+  .websocket-controls,
+  .test-ws-header,
+  .test-ws-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .test-ws-header {
+    align-items: flex-start;
+  }
+  
+  .preview-url-test {
+    min-width: auto;
+    flex-direction: column;
+  }
+  
+  .test-ws-controls {
+    justify-content: flex-start;
+  }
+}
+}
+
 .btn-loading::after {
   content: "";
   position: absolute;
