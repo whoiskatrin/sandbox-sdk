@@ -126,4 +126,20 @@ export class Sandbox<Env = unknown> extends Container<Env> {
     }
     return this.client.readFile(path, options.encoding);
   }
+
+  async connectWebSocket() {
+    return this.client.connectWebSocket();
+  }
+
+  async requestPreviewUrl(url: string, options?: { sessionId?: string }) {
+    return this.client.requestPreviewUrl(url, options);
+  }
+
+  sendWebSocketMessage(message: any) {
+    return this.client.sendWebSocketMessage(message);
+  }
+
+  disconnectWebSocket() {
+    return this.client.disconnectWebSocket();
+  }
 }

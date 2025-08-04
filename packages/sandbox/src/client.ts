@@ -145,7 +145,7 @@ interface PingResponse {
 }
 
 interface StreamEvent {
-  type: "command_start" | "output" | "command_complete" | "error";
+  type: "command_start" | "output" | "command_complete" | "error" | "websocket_connected" | "websocket_message" | "preview_ready";
   command?: string;
   args?: string[];
   stream?: "stdout" | "stderr";
@@ -185,12 +185,16 @@ interface HttpClientOptions {
   ) => void;
   onError?: (error: string, command?: string, args?: string[]) => void;
   onStreamEvent?: (event: StreamEvent) => void;
+  onWebSocketMessage?: (message: any) => void;
+  onWebSocketConnect?: () => void;
+  onWebSocketDisconnect?: () => void;
 }
 
 export class HttpClient {
   private baseUrl: string;
   private options: HttpClientOptions;
   private sessionId: string | null = null;
+  private websocket: WebSocket | null = null;
 
   constructor(options: HttpClientOptions = {}) {
     this.options = {
@@ -1683,6 +1687,103 @@ export class HttpClient {
 
   clearSession(): void {
     this.sessionId = null;
+  }
+
+  async connectWebSocket(): Promise<void> {
+    if (this.websocket) {
+      return;
+    }
+
+    const wsUrl = this.baseUrl.replace(/^http/, 'ws') + '/ws';
+    
+    return new Promise((resolve, reject) => {
+      try {
+        this.websocket = new WebSocket(wsUrl);
+        
+        this.websocket.onopen = () => {
+          console.log('[HTTP Client] WebSocket connected');
+          this.options.onWebSocketConnect?.();
+          resolve();
+        };
+        
+        this.websocket.onmessage = (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            console.log('[HTTP Client] WebSocket message:', message);
+            this.options.onWebSocketMessage?.(message);
+            
+            this.options.onStreamEvent?.({
+              type: "websocket_message",
+              ...message
+            });
+          } catch (error) {
+            console.error('[HTTP Client] Error parsing WebSocket message:', error);
+          }
+        };
+        
+        this.websocket.onclose = () => {
+          console.log('[HTTP Client] WebSocket disconnected');
+          this.websocket = null;
+          this.options.onWebSocketDisconnect?.();
+        };
+        
+        this.websocket.onerror = (error) => {
+          console.error('[HTTP Client] WebSocket error:', error);
+          reject(error);
+        };
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  sendWebSocketMessage(message: any): void {
+    if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket not connected');
+    }
+    
+    this.websocket.send(JSON.stringify(message));
+  }
+
+  disconnectWebSocket(): void {
+    if (this.websocket) {
+      this.websocket.close();
+      this.websocket = null;
+    }
+  }
+
+  async requestPreviewUrl(url: string, options?: { sessionId?: string }): Promise<string> {
+    if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
+      await this.connectWebSocket();
+    }
+
+    const requestId = `preview_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Preview URL request timeout'));
+      }, 10000);
+
+      const messageHandler = (message: any) => {
+        if (message.type === 'preview_response' && message.requestId === requestId) {
+          clearTimeout(timeout);
+          resolve(message.url);
+        }
+      };
+
+      const originalHandler = this.options.onWebSocketMessage;
+      this.options.onWebSocketMessage = (message) => {
+        originalHandler?.(message);
+        messageHandler(message);
+      };
+
+      this.sendWebSocketMessage({
+        type: 'preview_request',
+        requestId,
+        url,
+        sessionId: options?.sessionId || this.sessionId
+      });
+    });
   }
 }
 

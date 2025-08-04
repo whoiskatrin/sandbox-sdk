@@ -18,6 +18,7 @@ interface CommandResult {
 function REPL() {
   const [client, setClient] = useState<HttpClient | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<"disconnected" | "connecting" | "connected">("disconnected");
+  const [wsConnected, setWsConnected] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [commandInput, setCommandInput] = useState("");
   const [results, setResults] = useState<CommandResult[]>([]);
@@ -101,6 +102,17 @@ function REPL() {
       },
       onStreamEvent: (event) => {
         console.log("Stream event:", event);
+      },
+      onWebSocketConnect: () => {
+        console.log("WebSocket connected");
+        setWsConnected(true);
+      },
+      onWebSocketDisconnect: () => {
+        console.log("WebSocket disconnected");
+        setWsConnected(false);
+      },
+      onWebSocketMessage: (message) => {
+        console.log("WebSocket message received:", message);
       },
     });
 
@@ -297,6 +309,10 @@ function REPL() {
             ? "Connecting..."
             : "Disconnected"}
         </div>
+        <div className={`connection-status ${wsConnected ? 'connected' : 'disconnected'}`}>
+          {wsConnected ? "🔌" : "🔌"}
+          WebSocket {wsConnected ? 'Connected' : 'Disconnected'}
+        </div>
       </div>
 
       <div className="command-bar">
@@ -330,6 +346,26 @@ function REPL() {
           </button>
           <button type="button" onClick={clearResults} className="btn">
             Clear
+          </button>
+          <button 
+            type="button" 
+            onClick={async () => {
+              if (!client) return;
+              try {
+                if (!wsConnected) {
+                  await client.connectWebSocket();
+                  setWsConnected(true);
+                } else {
+                  client.disconnectWebSocket();
+                  setWsConnected(false);
+                }
+              } catch (error) {
+                console.error('WebSocket connection error:', error);
+              }
+            }} 
+            className={`btn ${wsConnected ? 'btn-stream' : ''}`}
+          >
+            {wsConnected ? 'Disconnect WS' : 'Connect WS'}
           </button>
         </div>
       </div>

@@ -80,6 +80,42 @@ function cleanupOldSessions() {
 setInterval(cleanupOldSessions, 10 * 60 * 1000);
 
 const server = serve({
+  websocket: {
+    message(ws: any, message: any) {
+      console.log(`[WebSocket] Received message:`, message);
+      
+      try {
+        const data = JSON.parse(message.toString());
+        
+        switch (data.type) {
+          case "preview_request":
+            handlePreviewRequest(ws, data);
+            break;
+          case "ping":
+            ws.send(JSON.stringify({ type: "pong", timestamp: new Date().toISOString() }));
+            break;
+          default:
+            ws.send(JSON.stringify({ type: "error", message: "Unknown message type" }));
+        }
+      } catch (error) {
+        console.error("[WebSocket] Error parsing message:", error);
+        ws.send(JSON.stringify({ type: "error", message: "Invalid JSON" }));
+      }
+    },
+    open(ws: any) {
+      console.log("[WebSocket] Connection opened");
+      activeConnections.add(ws);
+      ws.send(JSON.stringify({ type: "connected", timestamp: new Date().toISOString() }));
+    },
+    close(ws: any, code: any, message: any) {
+      console.log(`[WebSocket] Connection closed: ${code} ${message}`);
+      activeConnections.delete(ws);
+    },
+    error(ws: any, error: any) {
+      console.error("[WebSocket] Error:", error);
+      activeConnections.delete(ws);
+    }
+  },
   fetch(req: Request) {
     const url = new URL(req.url);
     const pathname = url.pathname;
@@ -103,6 +139,16 @@ const server = serve({
       // Handle different routes
       console.log(`[Container] Processing ${req.method} ${pathname}`);
       switch (pathname) {
+        case "/ws":
+        case "/api/ws":
+          if (req.headers.get("upgrade") === "websocket") {
+            return server.upgrade(req);
+          }
+          return new Response("WebSocket upgrade required", { 
+            status: 426,
+            headers: corsHeaders
+          });
+
         case "/":
           return new Response("Hello from Bun server! 🚀", {
             headers: {
@@ -2880,6 +2926,32 @@ function executeMoveFile(
   });
 }
 
+const activeConnections = new Set<any>();
+
+function handlePreviewRequest(ws: any, data: any) {
+  console.log(`[WebSocket] Handling preview request:`, data);
+  
+  ws.send(JSON.stringify({
+    type: "preview_response",
+    requestId: data.requestId,
+    url: data.url,
+    status: "ready",
+    timestamp: new Date().toISOString()
+  }));
+}
+
+function broadcastToAll(message: any) {
+  const messageStr = JSON.stringify(message);
+  for (const ws of activeConnections) {
+    try {
+      ws.send(messageStr);
+    } catch (error) {
+      console.error("[WebSocket] Error broadcasting:", error);
+      activeConnections.delete(ws);
+    }
+  }
+}
+
 console.log(`🚀 Bun server running on http://0.0.0.0:${server.port}`);
 console.log(`📡 HTTP API endpoints available:`);
 console.log(`   POST /api/session/create - Create a new session`);
@@ -2904,3 +2976,6 @@ console.log(`   POST /api/move - Move a file`);
 console.log(`   POST /api/move/stream - Move a file (streaming)`);
 console.log(`   GET  /api/ping - Health check`);
 console.log(`   GET  /api/commands - List available commands`);
+console.log(`🔌 WebSocket endpoints available:`);
+console.log(`   WS   /ws - WebSocket connection for preview URLs`);
+console.log(`   WS   /api/ws - WebSocket connection for preview URLs`);
